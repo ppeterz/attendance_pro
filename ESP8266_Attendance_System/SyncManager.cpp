@@ -111,6 +111,47 @@ void SyncManager::_flushQueueBatch() {
     // On failure: leave the queue untouched, retry on the next cadence.
 }
 
+void SyncManager::syncDailyStateFromCloud() {
+    if (!_net.isConnected()) return;
+
+    String todayDate = _rtc.nowDateString();
+    if (todayDate == "0000-00-00") return;
+
+    StaticJsonDocument<256> reqDoc;
+    reqDoc["action"] = "getDailyState";
+    reqDoc["secret"] = SYNC_SHARED_SECRET;
+    reqDoc["date"] = todayDate;
+
+    String payload;
+    serializeJson(reqDoc, payload);
+
+    WiFiClientSecure client;
+    client.setInsecure();
+    HTTPClient https;
+    https.setTimeout(SYNC_HTTP_TIMEOUT_MS);
+    https.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
+
+    if (!https.begin(client, SYNC_ENDPOINT_URL)) return;
+    https.addHeader("Content-Type", "application/json");
+
+    int code = https.POST(payload);
+    if (code > 0) {
+        String resp = https.getString();
+        DynamicJsonDocument doc(DAYSTATE_JSON_CAPACITY);
+        DeserializationError err = deserializeJson(doc, resp);
+        if (!err && doc["status"] == "ok" && doc.containsKey("states")) {
+            JsonObjectConst states = doc["states"].as<JsonObjectConst>();
+            _storage.updateDailyStateFromCloud(todayDate, states);
+            Serial.print(F("[SYNC] Cloud state synced for "));
+            Serial.print(todayDate);
+            Serial.print(F(" ("));
+            Serial.print(states.size());
+            Serial.println(F(" staff records)."));
+        }
+    }
+    https.end();
+}
+
 void SyncManager::_syncTimeFromNtp() {
     // Give the network stack 2 s to stabilise after WiFi connect before
     // sending UDP — avoids "Sync failed" on the very first boot attempt.
@@ -136,6 +177,7 @@ void SyncManager::_syncTimeFromNtp() {
         Serial.print((uint32_t)utcSec);
         Serial.print(F(" WAT="));
         Serial.println((uint32_t)localSec);
+        syncDailyStateFromCloud();
     } else {
         // Schedule a retry in 30 s instead of waiting the full 6-hour interval.
         _ntpRetryNeeded = true;

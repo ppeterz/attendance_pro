@@ -23,47 +23,33 @@ ButtonEvent ButtonDriver::tick() {
 
         case State::DEBOUNCING:
             if (!pressed) {
-                _state = State::IDLE; // was noise, bail out
+                _state = State::IDLE; // noise, return to idle
             } else if (now - _stateChangedAt >= BUTTON_DEBOUNCE_MS) {
                 _state = State::PRESSED;
-                _pressStartMs = now; // confirmed press-start time, used for both thresholds
+                _pressStartMs = now;
             }
             break;
 
-        case State::PRESSED:
+        case State::PRESSED: {
+            uint32_t duration = now - _pressStartMs;
             if (!pressed) {
                 _state = State::IDLE;
-                if (now - _lastReleaseMs < 400) {
-                    _lastReleaseMs = 0;
-                    return ButtonEvent::DOUBLE_PRESS;
+                if (duration < BUTTON_SHORT_MAX_MS) {
+                    return ButtonEvent::SHORT_PRESS;
+                } else if (duration >= BUTTON_OTA_MIN_MS && duration <= BUTTON_OTA_MAX_MS) {
+                    return ButtonEvent::OTA_PRESS;
                 }
-                _lastReleaseMs = now;
-                return ButtonEvent::SHORT_PRESS;
-            } else if (now - _pressStartMs >= BUTTON_VERY_LONG_PRESS_MS) {
+            } else if (duration >= BUTTON_VERY_LONG_PRESS_MS) {
                 _state = State::VERY_LONG_FIRED;
                 return ButtonEvent::VERY_LONG_PRESS;
-            } else if (now - _pressStartMs >= BUTTON_OTA_PRESS_MS) {
-                _state = State::OTA_FIRED;
-                return ButtonEvent::OTA_PRESS;
-            } else if (now - _pressStartMs >= BUTTON_LONG_PRESS_MS) {
+            } else if (duration >= BUTTON_LONG_PRESS_MS) {
                 _state = State::LONG_FIRED;
                 return ButtonEvent::LONG_PRESS;
             }
             break;
+        }
 
         case State::LONG_FIRED:
-            if (!pressed) {
-                _state = State::IDLE;
-            } else if (now - _pressStartMs >= BUTTON_VERY_LONG_PRESS_MS) {
-                _state = State::VERY_LONG_FIRED;
-                return ButtonEvent::VERY_LONG_PRESS;
-            } else if (now - _pressStartMs >= BUTTON_OTA_PRESS_MS) {
-                _state = State::OTA_FIRED;
-                return ButtonEvent::OTA_PRESS;
-            }
-            break;
-
-        case State::OTA_FIRED:
             if (!pressed) {
                 _state = State::IDLE;
             } else if (now - _pressStartMs >= BUTTON_VERY_LONG_PRESS_MS) {
@@ -74,7 +60,7 @@ ButtonEvent ButtonDriver::tick() {
 
         case State::VERY_LONG_FIRED:
             if (!pressed) {
-                _state = State::IDLE; // just wait out the release, already fired
+                _state = State::IDLE;
             }
             break;
     }

@@ -91,10 +91,9 @@ void printHelp() {
     Serial.println(F("  help        - this message"));
     Serial.println(F("Button gestures:"));
     Serial.println(F("  short press   - manual sync (or cancel, if mid-enrollment)"));
-    Serial.println(F("  double tap    - check & install firmware update from GitHub"));
-    Serial.println(F("  hold 1.5s     - enter card enrollment mode"));
-    Serial.println(F("  hold 4s       - check & install firmware update from GitHub"));
-    Serial.println(F("  hold 10s      - wipe saved WiFi + reboot into phone setup mode"));
+    Serial.println(F("  hold <1.5s    - check & install firmware update from GitHub"));
+    Serial.println(F("  hold >2s      - enter card enrollment mode"));
+    Serial.println(F("  hold 6s       - wipe saved WiFi + reboot into setup hotspot"));
 }
 
 void printStatus() {
@@ -355,18 +354,18 @@ void loop() {
     tickWifiSetupScreen();
 
     ButtonEvent btnEvent = button.tick();
-    if (btnEvent == ButtonEvent::DOUBLE_PRESS || btnEvent == ButtonEvent::OTA_PRESS) {
-        Serial.println(F("[BUTTON] OTA Update gesture detected -> Checking GitHub for update"));
+    if (btnEvent == ButtonEvent::OTA_PRESS) {
+        Serial.println(F("[BUTTON] OTA Update gesture (held <1.5s) -> Checking GitHub for update"));
         if (!uiManager.inEnrollmentMode()) {
             githubOta.triggerUpdateFromButton();
         }
     } else if (btnEvent == ButtonEvent::LONG_PRESS) {
-        Serial.println(F("[BUTTON] Long press detected -> Entering Enrollment Mode"));
+        Serial.println(F("[BUTTON] Long press (held >2s) -> Entering Enrollment Mode"));
         if (!uiManager.inEnrollmentMode()) {
             enterEnrollment();
         }
     } else if (btnEvent == ButtonEvent::VERY_LONG_PRESS) {
-        Serial.println(F("[BUTTON] Very long press detected -> Resetting WiFi"));
+        Serial.println(F("[BUTTON] Very long press (held 6s) -> Resetting WiFi"));
         if (!uiManager.inEnrollmentMode()) {
             Serial.println(F("[WiFi] Reset triggered via button hold. Wiping and rebooting..."));
             uiManager.showWifiResetting();
@@ -374,7 +373,7 @@ void loop() {
             network.resetWifiSettings();
         }
     } else if (btnEvent == ButtonEvent::SHORT_PRESS) {
-        Serial.println(F("[BUTTON] Short press detected -> Requesting manual sync"));
+        Serial.println(F("[BUTTON] Short press (tap) -> Requesting manual sync"));
         if (uiManager.inEnrollmentMode()) {
             abortEnrollment(F("[Enrollment] Cancelled."));
         } else {

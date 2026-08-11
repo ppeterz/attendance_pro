@@ -31,13 +31,43 @@ function doPost(e) {
     if (!body || body.secret !== SHARED_SECRET) {
       return jsonResponse({ status: "error", message: "invalid secret" });
     }
-    if (!Array.isArray(body.records) || body.records.length === 0) {
-      return jsonResponse({ status: "error", message: "no records" });
-    }
 
     const sheet = getOrCreateSheet();
     const deviceId = body.device || "unknown";
     const now = new Date();
+
+    // Query action: return daily state of all staff for target date
+    if (body.action === "getDailyState") {
+      const targetDate = body.date || Utilities.formatDate(now, TIMEZONE, "yyyy-MM-dd");
+      const existingData = sheet.getDataRange().getValues();
+      const states = {};
+
+      for (let i = 1; i < existingData.length; i++) {
+        const cellVal = existingData[i][0];
+        if (!cellVal) continue;
+        const rowDate = (cellVal instanceof Date)
+          ? Utilities.formatDate(cellVal, TIMEZONE, "yyyy-MM-dd")
+          : String(cellVal).trim();
+
+        if (rowDate === targetDate) {
+          const uid = String(existingData[i][2]).trim();
+          const typeStr = String(existingData[i][7]).trim(); // "IN" or "OUT"
+          if (uid) {
+            if (!states[uid]) {
+              states[uid] = { t: (typeStr === "OUT" ? 1 : 0), c: 1 };
+            } else {
+              states[uid].t = (typeStr === "OUT" ? 1 : 0);
+              states[uid].c += 1;
+            }
+          }
+        }
+      }
+      return jsonResponse({ status: "ok", date: targetDate, states: states });
+    }
+
+    if (!Array.isArray(body.records) || body.records.length === 0) {
+      return jsonResponse({ status: "error", message: "no records" });
+    }
 
     // Build a dedup set from existing rows (UID col=C, Type col=H, Time col=B).
     // Key = uid|type|date|time so the exact same scan can't appear twice.

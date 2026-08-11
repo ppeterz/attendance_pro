@@ -32,6 +32,7 @@ public:
 
     // Wire this to the button's SHORT_PRESS event.
     void requestManualSync();
+    void syncDailyStateFromCloud();
 
     int pendingCount();
 

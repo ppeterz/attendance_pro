@@ -120,6 +120,36 @@ AttendanceType StorageDriver::resolveScanType(const String &uid, const String &t
     return resolved;
 }
 
+bool StorageDriver::updateDailyStateFromCloud(const String &todayDate, JsonObjectConst statesObj) {
+    DynamicJsonDocument doc(DAYSTATE_JSON_CAPACITY);
+    File fr = LittleFS.open(FS_PATH_DAILY_STATE, "r");
+    if (fr) {
+        deserializeJson(doc, fr);
+        fr.close();
+    }
+
+    int updatedCount = 0;
+    for (JsonPairConst kv : statesObj) {
+        String uid = kv.key().c_str();
+        JsonObjectConst rec = kv.value().as<JsonObjectConst>();
+        uint8_t type = rec["t"].as<uint8_t>();
+        uint8_t count = rec["c"].as<uint8_t>();
+
+        doc[uid]["d"] = todayDate;
+        doc[uid]["t"] = type;
+        doc[uid]["c"] = count;
+        updatedCount++;
+    }
+
+    File fw = LittleFS.open(FS_PATH_DAILY_STATE, "w");
+    if (fw) {
+        serializeJson(doc, fw);
+        fw.close();
+        return true;
+    }
+    return false;
+}
+
 // ---------------- Offline queue (JSON-lines, append-only) ----------------
 
 bool StorageDriver::appendToQueue(const String &uid, const StaffInfo &staff,

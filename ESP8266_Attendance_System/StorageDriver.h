@@ -2,6 +2,7 @@
 #define STORAGE_DRIVER_H
 
 #include <Arduino.h>
+#include <ArduinoJson.h>
 #include "Config.h"
 
 // Full staff record attached to an enrolled card.
@@ -35,6 +36,7 @@ public:
     // returns the resolved type. Day-boundary reset is automatic:
     // if the stored last-date != today, it always resolves to CHECK_IN.
     AttendanceType resolveScanType(const String &uid, const String &todayDate);
+    bool updateDailyStateFromCloud(const String &todayDate, JsonObjectConst statesObj);
 
     // ---- Offline queue ----
     // Memory-safe by design: never loads the whole queue into RAM.
