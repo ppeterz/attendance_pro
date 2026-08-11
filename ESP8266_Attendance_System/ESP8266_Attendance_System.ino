@@ -354,10 +354,12 @@ void loop() {
 
     ButtonEvent btnEvent = button.tick();
     if (btnEvent == ButtonEvent::LONG_PRESS) {
+        Serial.println(F("[BUTTON] Long press detected -> Entering Enrollment Mode"));
         if (!uiManager.inEnrollmentMode()) {
             enterEnrollment();
         }
     } else if (btnEvent == ButtonEvent::VERY_LONG_PRESS) {
+        Serial.println(F("[BUTTON] Very long press detected -> Resetting WiFi"));
         if (!uiManager.inEnrollmentMode()) {
             Serial.println(F("[WiFi] Reset triggered via button hold. Wiping and rebooting..."));
             uiManager.showWifiResetting();
@@ -365,6 +367,7 @@ void loop() {
             network.resetWifiSettings();
         }
     } else if (btnEvent == ButtonEvent::SHORT_PRESS) {
+        Serial.println(F("[BUTTON] Short press detected -> Requesting manual sync"));
         if (uiManager.inEnrollmentMode()) {
             abortEnrollment(F("[Enrollment] Cancelled."));
         } else {
