@@ -21,6 +21,7 @@ public:
 
     void checkNow();   // fetch version.txt, compare, notify (or auto-install)
     void installNow(); // download + flash firmware.bin right now
+    void triggerUpdateFromButton(); // called when user presses button to update
 
     bool updateAvailable() const { return _updateAvailable; }
     const String &availableVersion() const { return _availableVersion; }

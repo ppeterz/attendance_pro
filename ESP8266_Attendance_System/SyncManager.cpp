@@ -25,33 +25,36 @@ void SyncManager::requestManualSync() {
 
 bool SyncManager::_postJson(const String &jsonBody) {
     WiFiClientSecure client;
-    // Pragmatic choice for a field device: skip certificate validation
-    // rather than pin Google's rotating cert fingerprint (which would
-    // silently break sync every time Google rotates it). Traffic still
-    // travels over TLS; this only forgoes verifying the cert chain.
     client.setInsecure();
 
     HTTPClient https;
     https.setTimeout(SYNC_HTTP_TIMEOUT_MS);
+    https.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
 
     if (!https.begin(client, SYNC_ENDPOINT_URL)) {
+        Serial.println(F("[SYNC] Failed to begin HTTPS connection."));
         return false;
     }
     https.addHeader("Content-Type", "application/json");
 
     int httpCode = https.POST(jsonBody);
     bool ok = false;
-    if (httpCode == 200) {
-        // Apps Script ALWAYS returns HTTP 200, even for a rejected
-        // request (bad secret, malformed body, etc.) — there's no way
-        // for it to send a real error status code. So httpCode==200
-        // only means "the script ran", not "it accepted the data".
-        // We have to check the JSON body's status field to know if the
-        // write actually happened; otherwise a rejected batch would
-        // look like a success and get wrongly cleared from the queue.
+    Serial.print(F("[SYNC] HTTP POST code: "));
+    Serial.println(httpCode);
+
+    if (httpCode > 0) {
         String resp = https.getString();
-        ok = resp.indexOf("\"status\":\"ok\"") >= 0;
+        Serial.print(F("[SYNC] Response: "));
+        Serial.println(resp);
+        ok = (resp.indexOf("\"status\":\"ok\"") >= 0);
     }
+
+    if (ok) {
+        Serial.println(F("[SYNC] Sync succeeded -> queue cleared."));
+    } else {
+        Serial.println(F("[SYNC] Sync failed or rejected by server."));
+    }
+
     https.end();
     return ok;
 }

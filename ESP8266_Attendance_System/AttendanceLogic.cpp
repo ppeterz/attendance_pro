@@ -31,6 +31,12 @@ bool AttendanceLogic::tick(AttendanceEvent &outEvent) {
 
     String today = _rtc.nowDateString();
     AttendanceType type = _storage.resolveScanType(uid, today);
+    if (type == AttendanceType::ALREADY_DONE) {
+        outEvent.result = AttendanceEvent::Result::ALREADY_COMPLETED_TODAY;
+        outEvent.uid = uid;
+        outEvent.staff = staff;
+        return true;
+    }
 
     outEvent.result = AttendanceEvent::Result::VALID_SCAN;
     outEvent.uid = uid;

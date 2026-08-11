@@ -28,6 +28,7 @@ bool GithubOtaManager::_fetchLatestVersion(String &outVersion) {
 
     HTTPClient https;
     https.setTimeout(SYNC_HTTP_TIMEOUT_MS);
+    https.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
     if (!https.begin(client, GITHUB_VERSION_URL)) return false;
 
     if (GITHUB_USE_PRIVATE_REPO) {
@@ -46,6 +47,41 @@ bool GithubOtaManager::_fetchLatestVersion(String &outVersion) {
     }
     https.end();
     return ok;
+}
+
+void GithubOtaManager::triggerUpdateFromButton() {
+    if (!_wifiConnected) {
+        _ui.showTransientMessage("WiFi Disconnected", "Cannot update", 2000);
+        Serial.println(F("[OTA-GH] Button update failed: WiFi not connected."));
+        return;
+    }
+
+    _ui.showTransientMessage("Checking OTA...", "Please wait...", 2000);
+    Serial.println(F("[OTA-GH] Button triggered OTA update check..."));
+
+    String latest;
+    if (!_fetchLatestVersion(latest)) {
+        _ui.showTransientMessage("OTA Check Failed", "Check internet", 2000);
+        Serial.println(F("[OTA-GH] Failed to fetch version.txt from GitHub."));
+        return;
+    }
+
+    Serial.print(F("[OTA-GH] Running: v"));
+    Serial.print(FIRMWARE_VERSION);
+    Serial.print(F(" | Latest on GitHub: v"));
+    Serial.println(latest);
+
+    if (latest != String(FIRMWARE_VERSION)) {
+        _updateAvailable = true;
+        _availableVersion = latest;
+        _ui.showTransientMessage("New v" + latest + " found!", "Updating now...", 2000);
+        delay(1000);
+        installNow();
+    } else {
+        _updateAvailable = false;
+        _ui.showTransientMessage("v" + String(FIRMWARE_VERSION), "Up to date!", 2000);
+        Serial.println(F("[OTA-GH] Device is already running the latest firmware version."));
+    }
 }
 
 void GithubOtaManager::checkNow() {
@@ -72,7 +108,7 @@ void GithubOtaManager::checkNow() {
             Serial.println(F("[OTA-GH] New version found, auto-installing (GITHUB_OTA_AUTO_INSTALL=true)..."));
             installNow();
         } else {
-            Serial.println(F("[OTA-GH] New version available. Type 'update' in Serial to install."));
+            Serial.println(F("[OTA-GH] New version available. Press OTA button or type 'update' to install."));
         }
     } else {
         _updateAvailable = false;
@@ -94,6 +130,7 @@ void GithubOtaManager::_performUpdate() {
 
     HTTPClient https;
     https.setTimeout(SYNC_HTTP_TIMEOUT_MS);
+    https.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
     if (!https.begin(client, GITHUB_FIRMWARE_URL)) {
         Serial.println(F("[OTA-GH] Failed to start firmware download."));
         return;

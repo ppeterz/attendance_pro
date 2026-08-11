@@ -19,7 +19,7 @@
 
 // ---------- Firmware identity ----------
 #ifndef FIRMWARE_VERSION
-#define FIRMWARE_VERSION "1.2.1"
+#define FIRMWARE_VERSION "1.2.2"
 #endif
 #define DEVICE_ID "ATTEND-01"   // single unit for now; bump if you add more later
                                  // also used as OTA hostname + WiFi setup AP name
@@ -61,6 +61,7 @@
 // ---------- Timing / behavior thresholds ----------
 #define DUPLICATE_SCAN_IGNORE_MS   5000    // ignore repeat tap of same card within 5s
 #define BUTTON_LONG_PRESS_MS       1500    // hold >=1.5s = enrollment mode
+#define BUTTON_OTA_PRESS_MS        4000    // hold >=4.0s = check & install GitHub OTA update
 #define BUTTON_VERY_LONG_PRESS_MS  10000   // hold >=10s  = wipe WiFi settings
 #define BUTTON_DEBOUNCE_MS         40
 #define ENROLLMENT_TIMEOUT_MS      60000   // auto-exit enrollment mode if idle 30s
@@ -128,11 +129,11 @@
 #define FS_PATH_OFFLINE_QUEUE    "/queue.jsonl"      // append-only, one record per line
 
 // Google Apps Script Web App URL (deploy as "Anyone" access, /exec endpoint)
-#define SYNC_ENDPOINT_URL   "https://script.google.com/macros/s/AKfycbyZsUb8AIX5rXBkO5K5xXhA3I4kY1Kq5TGEUYEy_bI6xqmCoHvt8hqLK5t0crKMXPXgAQ/exec"
+#define SYNC_ENDPOINT_URL   "https://script.google.com/macros/s/AKfycbw5TGrgcrYRR4PlemAjBy1SAwbkMSomg4w5D6zODZHRsg4h1chK_wJJL9okW-H21mSXAA/exec"
 // Simple shared-secret so randoms can't POST junk into your sheet
 #define SYNC_SHARED_SECRET  "59cfe9e0f6ef676a8efe4e6c384de8a76682d78f7d48c0c7"
 
 // ---------- Attendance record types ----------
-enum class AttendanceType : uint8_t { CHECK_IN = 0, CHECK_OUT = 1 };
+enum class AttendanceType : uint8_t { CHECK_IN = 0, CHECK_OUT = 1, ALREADY_DONE = 2 };
 
 #endif // CONFIG_H

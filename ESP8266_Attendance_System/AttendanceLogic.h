@@ -8,7 +8,7 @@
 #include "StorageDriver.h"
 
 struct AttendanceEvent {
-    enum class Result : uint8_t { VALID_SCAN, DUPLICATE_IGNORED, UNKNOWN_CARD };
+    enum class Result : uint8_t { VALID_SCAN, DUPLICATE_IGNORED, UNKNOWN_CARD, ALREADY_COMPLETED_TODAY };
     Result result;
     String uid;
     StaffInfo staff;       // populated only for VALID_SCAN

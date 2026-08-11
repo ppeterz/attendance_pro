@@ -23,6 +23,7 @@ public:
 
     void showScanResult(const AttendanceEvent &event);
     void showManualSyncTriggered();
+    void showTransientMessage(const String &line1, const String &line2, uint32_t durationMs = 2000);
 
     // ---- Enrollment ----
     void enterEnrollmentMode();

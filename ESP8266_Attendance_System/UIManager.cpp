@@ -49,6 +49,10 @@ void UIManager::showScanResult(const AttendanceEvent &event) {
             line2 = typeStr + _rtc.nowTimeString();
             break;
         }
+        case AttendanceEvent::Result::ALREADY_COMPLETED_TODAY:
+            line1 = event.staff.firstName;
+            line2 = "Done for today";
+            break;
         case AttendanceEvent::Result::DUPLICATE_IGNORED:
             line1 = "Already scanned";
             line2 = "One moment...";
@@ -63,6 +67,10 @@ void UIManager::showScanResult(const AttendanceEvent &event) {
 
 void UIManager::showManualSyncTriggered() {
     _showTransient("Sync requested", "Check Q: shortly", 1500);
+}
+
+void UIManager::showTransientMessage(const String &line1, const String &line2, uint32_t durationMs) {
+    _showTransient(line1, line2, durationMs);
 }
 
 // ---------------- Enrollment flow ----------------

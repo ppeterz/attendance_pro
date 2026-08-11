@@ -91,7 +91,9 @@ void printHelp() {
     Serial.println(F("  help        - this message"));
     Serial.println(F("Button gestures:"));
     Serial.println(F("  short press   - manual sync (or cancel, if mid-enrollment)"));
+    Serial.println(F("  double tap    - check & install firmware update from GitHub"));
     Serial.println(F("  hold 1.5s     - enter card enrollment mode"));
+    Serial.println(F("  hold 4s       - check & install firmware update from GitHub"));
     Serial.println(F("  hold 10s      - wipe saved WiFi + reboot into phone setup mode"));
 }
 
@@ -353,7 +355,12 @@ void loop() {
     tickWifiSetupScreen();
 
     ButtonEvent btnEvent = button.tick();
-    if (btnEvent == ButtonEvent::LONG_PRESS) {
+    if (btnEvent == ButtonEvent::DOUBLE_PRESS || btnEvent == ButtonEvent::OTA_PRESS) {
+        Serial.println(F("[BUTTON] OTA Update gesture detected -> Checking GitHub for update"));
+        if (!uiManager.inEnrollmentMode()) {
+            githubOta.triggerUpdateFromButton();
+        }
+    } else if (btnEvent == ButtonEvent::LONG_PRESS) {
         Serial.println(F("[BUTTON] Long press detected -> Entering Enrollment Mode"));
         if (!uiManager.inEnrollmentMode()) {
             enterEnrollment();

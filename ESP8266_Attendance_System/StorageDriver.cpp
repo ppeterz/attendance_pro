@@ -82,23 +82,34 @@ AttendanceType StorageDriver::resolveScanType(const String &uid, const String &t
         fr.close();
     }
 
-    AttendanceType resolved = AttendanceType::CHECK_IN; // safe default
+    AttendanceType resolved = AttendanceType::CHECK_IN;
 
     if (doc.containsKey(uid)) {
         String lastDate = doc[uid]["d"].as<String>();
         uint8_t lastType = doc[uid]["t"].as<uint8_t>();
+        uint8_t count = doc[uid].containsKey("c") ? doc[uid]["c"].as<uint8_t>() : (lastDate == todayDate ? 1 : 0);
+
         if (lastDate == todayDate) {
-            // Same day -> toggle from whatever we last recorded
-            resolved = (lastType == (uint8_t)AttendanceType::CHECK_IN)
-                           ? AttendanceType::CHECK_OUT
-                           : AttendanceType::CHECK_IN;
+            if (count >= 2 || lastType == (uint8_t)AttendanceType::CHECK_OUT) {
+                // Already checked in AND checked out today!
+                return AttendanceType::ALREADY_DONE;
+            } else {
+                // Was CHECK_IN -> now CHECK_OUT
+                resolved = AttendanceType::CHECK_OUT;
+            }
+        } else {
+            // New day reset -> CHECK_IN
+            resolved = AttendanceType::CHECK_IN;
         }
-        // else: different day (or blank) -> day boundary reset -> stays CHECK_IN
+    } else {
+        // First time ever -> CHECK_IN
+        resolved = AttendanceType::CHECK_IN;
     }
 
     // Persist the new state
     doc[uid]["t"] = (uint8_t)resolved;
     doc[uid]["d"] = todayDate;
+    doc[uid]["c"] = (resolved == AttendanceType::CHECK_IN) ? 1 : 2;
 
     File fw = LittleFS.open(FS_PATH_DAILY_STATE, "w");
     if (fw) {
@@ -137,6 +148,7 @@ int StorageDriver::queueCount() {
     int count = 0;
     while (f.available()) {
         String line = f.readStringUntil('\n');
+        line.trim();
         if (line.length() > 0) count++;
     }
     f.close();
@@ -169,6 +181,11 @@ String StorageDriver::readQueueBatchAsJsonArray(int maxRecords, int &outRecordCo
 }
 
 bool StorageDriver::removeFirstNFromQueue(int n) {
+    int total = queueCount();
+    if (n >= total) {
+        return clearQueue();
+    }
+
     File fr = LittleFS.open(FS_PATH_OFFLINE_QUEUE, "r");
     if (!fr) return false;
 
@@ -179,6 +196,7 @@ bool StorageDriver::removeFirstNFromQueue(int n) {
     int skipped = 0;
     while (fr.available()) {
         String line = fr.readStringUntil('\n');
+        line.trim();
         if (line.length() == 0) continue;
         if (skipped < n) {
             skipped++;

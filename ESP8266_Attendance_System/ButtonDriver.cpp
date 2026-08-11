@@ -33,13 +33,18 @@ ButtonEvent ButtonDriver::tick() {
         case State::PRESSED:
             if (!pressed) {
                 _state = State::IDLE;
+                if (now - _lastReleaseMs < 400) {
+                    _lastReleaseMs = 0;
+                    return ButtonEvent::DOUBLE_PRESS;
+                }
+                _lastReleaseMs = now;
                 return ButtonEvent::SHORT_PRESS;
             } else if (now - _pressStartMs >= BUTTON_VERY_LONG_PRESS_MS) {
-                // Held straight through both thresholds in one tick gap (rare, but
-                // ticks are frequent so this basically never actually happens —
-                // included for correctness).
                 _state = State::VERY_LONG_FIRED;
                 return ButtonEvent::VERY_LONG_PRESS;
+            } else if (now - _pressStartMs >= BUTTON_OTA_PRESS_MS) {
+                _state = State::OTA_FIRED;
+                return ButtonEvent::OTA_PRESS;
             } else if (now - _pressStartMs >= BUTTON_LONG_PRESS_MS) {
                 _state = State::LONG_FIRED;
                 return ButtonEvent::LONG_PRESS;
@@ -48,7 +53,19 @@ ButtonEvent ButtonDriver::tick() {
 
         case State::LONG_FIRED:
             if (!pressed) {
-                _state = State::IDLE; // released after long-press, already fired
+                _state = State::IDLE;
+            } else if (now - _pressStartMs >= BUTTON_VERY_LONG_PRESS_MS) {
+                _state = State::VERY_LONG_FIRED;
+                return ButtonEvent::VERY_LONG_PRESS;
+            } else if (now - _pressStartMs >= BUTTON_OTA_PRESS_MS) {
+                _state = State::OTA_FIRED;
+                return ButtonEvent::OTA_PRESS;
+            }
+            break;
+
+        case State::OTA_FIRED:
+            if (!pressed) {
+                _state = State::IDLE;
             } else if (now - _pressStartMs >= BUTTON_VERY_LONG_PRESS_MS) {
                 _state = State::VERY_LONG_FIRED;
                 return ButtonEvent::VERY_LONG_PRESS;
