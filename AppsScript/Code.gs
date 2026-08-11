@@ -136,11 +136,11 @@ function applyStatusFormatting(sheet, row, status) {
   if (status === "Present") {
     statusCell.setBackground("#c8e6c9")  // Soft light green
               .setFontColor("#1b5e20")   // Dark green text
-              .setBold(true);
+              .setFontWeight("bold");
   } else if (status === "Signed Out") {
     statusCell.setBackground("#ffcdd2")  // Soft light pink
               .setFontColor("#b71c1c")   // Dark red text
-              .setBold(true);
+              .setFontWeight("bold");
   }
 }
 
@@ -156,7 +156,7 @@ function getOrCreateSheet() {
     ]]);
     headerRange.setBackground("#388e3c") // Bold green header matching your layout
                .setFontColor("#ffffff")
-               .setBold(true);
+               .setFontWeight("bold");
     sheet.setFrozenRows(1);
     sheet.setColumnWidth(1, 110); // Date
     sheet.setColumnWidth(2, 120); // Employee ID

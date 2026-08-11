@@ -85,6 +85,9 @@ void printHelp() {
     Serial.println(F("Commands:"));
     Serial.println(F("  status      - show system status"));
     Serial.println(F("  heap        - show free heap memory"));
+    Serial.println(F("  clearday    - wipe today's check-in/out state from flash to re-test cards"));
+    Serial.println(F("  clearqueue  - wipe unsynced offline queue from flash"));
+    Serial.println(F("  clearall    - wipe both daily state and offline queue"));
     Serial.println(F("  resetwifi   - wipe saved WiFi + reboot into phone setup mode"));
     Serial.println(F("  checkupdate - check GitHub for a newer firmware version now"));
     Serial.println(F("  update      - download + flash the newer version (after checkupdate finds one)"));
@@ -206,6 +209,16 @@ void processSerialLine(const String &rawLine) {
         Serial.print(F("Free heap: "));
         Serial.print(ESP.getFreeHeap());
         Serial.println(F(" bytes"));
+    } else if (line == "clearday") {
+        storage.clearDailyState();
+        Serial.println(F("[OK] Daily scan state cleared from flash. You can re-scan all cards today!"));
+    } else if (line == "clearqueue") {
+        storage.clearQueue();
+        Serial.println(F("[OK] Offline queue wiped from flash."));
+    } else if (line == "clearall") {
+        storage.clearDailyState();
+        storage.clearQueue();
+        Serial.println(F("[OK] Both daily state and offline queue wiped from flash."));
     } else if (line == "resetwifi") {
         Serial.println(F("Wiping saved WiFi and rebooting into setup mode..."));
         network.resetWifiSettings();

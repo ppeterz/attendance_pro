@@ -60,6 +60,7 @@
 
 // ---------- Timing / behavior thresholds ----------
 #define DUPLICATE_SCAN_IGNORE_MS   5000    // ignore repeat tap of same card within 5s
+#define RAPID_MULTI_CARD_WARN_MS   2500    // flag rapid taps of different cards (<2.5s)
 #define BUTTON_DEBOUNCE_MS         40
 #define BUTTON_SHORT_MAX_MS        500     // <500ms = short press (manual sync)
 #define BUTTON_OTA_MIN_MS          500     // 500ms..1800ms (released <1.5s) = GitHub OTA update
@@ -131,7 +132,7 @@
 #define FS_PATH_OFFLINE_QUEUE    "/queue.jsonl"      // append-only, one record per line
 
 // Google Apps Script Web App URL (deploy as "Anyone" access, /exec endpoint)
-#define SYNC_ENDPOINT_URL   "https://script.google.com/macros/s/AKfycbzOUtj40jdzQMfFMEamGknfENpKkI2NcstVbDWd1JPXzI_cpJdrTbFIaLnbAdiErU6vlw/exec"
+#define SYNC_ENDPOINT_URL   "https://script.google.com/macros/s/AKfycbyUroh-gKqUyYDmWHK3xB6fJOBO_AY4CdYYkf1gWi-ZB9SgYLo1aSdIoWAWqBpxvNULcQ/exec"
 // Simple shared-secret so randoms can't POST junk into your sheet
 #define SYNC_SHARED_SECRET  "59cfe9e0f6ef676a8efe4e6c384de8a76682d78f7d48c0c7"
 

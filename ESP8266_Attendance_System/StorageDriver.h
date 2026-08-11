@@ -37,6 +37,7 @@ public:
     // if the stored last-date != today, it always resolves to CHECK_IN.
     AttendanceType resolveScanType(const String &uid, const String &todayDate);
     bool updateDailyStateFromCloud(const String &todayDate, JsonObjectConst statesObj);
+    bool clearDailyState();
 
     // ---- Offline queue ----
     // Memory-safe by design: never loads the whole queue into RAM.

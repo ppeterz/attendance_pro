@@ -166,6 +166,14 @@ bool StorageDriver::updateDailyStateFromCloud(const String &todayDate, JsonObjec
     return false;
 }
 
+bool StorageDriver::clearDailyState() {
+    File f = LittleFS.open(FS_PATH_DAILY_STATE, "w");
+    if (!f) return false;
+    f.print("{}");
+    f.close();
+    return true;
+}
+
 // ---------------- Offline queue (JSON-lines, append-only) ----------------
 
 bool StorageDriver::appendToQueue(const String &uid, const StaffInfo &staff,

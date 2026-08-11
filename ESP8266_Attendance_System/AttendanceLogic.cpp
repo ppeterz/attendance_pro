@@ -11,14 +11,22 @@ bool AttendanceLogic::tick(AttendanceEvent &outEvent) {
     _rfid.releaseCard(); // done reading the tag as soon as we have the UID
 
     uint32_t now = millis();
+    uint32_t elapsedSinceLast = now - _lastScanMs;
 
-    // Duplicate tap suppression (Directive 4-adjacent: debounce, but for
-    // an RFID "contact" rather than a mechanical switch)
-    if (uid == _lastUid && (now - _lastScanMs) < DUPLICATE_SCAN_IGNORE_MS) {
+    // 1. Same-card duplicate tap suppression (5s ignore window for identical UID)
+    if (uid == _lastUid && elapsedSinceLast < DUPLICATE_SCAN_IGNORE_MS) {
         outEvent.result = AttendanceEvent::Result::DUPLICATE_IGNORED;
         outEvent.uid = uid;
         return true;
     }
+
+    // 2. Rapid multi-card detection (different card scanned < 2.5s after previous card)
+    if (_lastScanMs > 0 && uid != _lastUid && elapsedSinceLast < RAPID_MULTI_CARD_WARN_MS) {
+        Serial.print(F("[SECURITY] Rapid multi-card tap detected! ("));
+        Serial.print(elapsedSinceLast);
+        Serial.println(F(" ms after previous card)"));
+    }
+
     _lastUid = uid;
     _lastScanMs = now;
 
