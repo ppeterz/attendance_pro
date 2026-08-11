@@ -19,6 +19,7 @@ public:
     UIManager(LCD_Driver &lcd, RTC_Driver &rtc);
 
     void begin();
+    void finishStartup();
     void tick(int pendingQueueCount); // call every loop; no-op outside NORMAL mode
 
     void showScanResult(const AttendanceEvent &event);

@@ -4,6 +4,12 @@ UIManager::UIManager(LCD_Driver &lcd, RTC_Driver &rtc) : _lcd(lcd), _rtc(rtc) {}
 
 void UIManager::begin() {
     _lcd.begin();
+    _lcd.showTwoLines("SYSTEM STARTING", "Please wait...");
+}
+
+void UIManager::finishStartup() {
+    _lcd.showTwoLines("System Ready", "Starting up...");
+    delay(1000);
     _showIdle(0);
 }
 

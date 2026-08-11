@@ -19,7 +19,7 @@
 
 // ---------- Firmware identity ----------
 #ifndef FIRMWARE_VERSION
-#define FIRMWARE_VERSION "1.2.4"
+#define FIRMWARE_VERSION "1.2.5"
 #endif
 #define DEVICE_ID "ATTEND-01"   // single unit for now; bump if you add more later
                                  // also used as OTA hostname + WiFi setup AP name

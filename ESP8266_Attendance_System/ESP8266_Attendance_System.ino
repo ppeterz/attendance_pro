@@ -316,16 +316,16 @@ void setup() {
     ledSet(false);
 
     Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN); // shared bus: DS3231 + LCD
+    uiManager.begin();                    // Displays "SYSTEM STARTING / Please wait..." right away
 
     bool storageOk = storage.begin();
     bool rtcOk = rtcDriver.begin();
-    uiManager.begin();
     rfid.begin();
     bool rfidOk = rfid.selfTest();
     button.begin();
     ota.begin();
     githubOta.begin();
-    network.begin(); // may block briefly trying saved creds, then opens the portal if needed
+    network.begin(); // connects to saved WiFi or opens portal
     sync.begin();
 
     Serial.println(storageOk ? F("[OK] LittleFS mounted") : F("[FAIL] LittleFS mount failed"));
@@ -340,6 +340,8 @@ void setup() {
         Serial.print(F("[SETUP] No saved WiFi. Setup hotspot: "));
         Serial.println(network.setupApName());
         Serial.println(F("        Connect to it from a phone to configure WiFi."));
+    } else {
+        uiManager.finishStartup(); // Shows "System Ready / Starting up..." for 1s, then ready clock
     }
     printHelp();
 }
