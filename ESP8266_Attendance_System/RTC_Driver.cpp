@@ -24,11 +24,15 @@ String RTC_Driver::nowDateString() {
 }
 
 String RTC_Driver::nowTimeString() {
-    if (!_available) return "--:--";
+    if (!_available) return "--:-- --";
     DateTime n = _rtc.now();
-    char buf[6];
-    snprintf(buf, sizeof(buf), "%02d:%02d", n.hour(), n.minute());
-    return String(buf);
+    uint8_t h = n.hour();
+    const char *ampm = (h < 12) ? "AM" : "PM";
+    uint8_t h12 = h % 12;
+    if (h12 == 0) h12 = 12;          // midnight/noon → 12, not 0
+    char buf[9];
+    snprintf(buf, sizeof(buf), "%2d:%02d %s", h12, n.minute(), ampm);
+    return String(buf);              // e.g. " 1:47 PM" or "12:47 AM" — always 8 chars
 }
 
 String RTC_Driver::nowDateTimeString() {

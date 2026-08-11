@@ -44,6 +44,8 @@ private:
     bool _flushRequested = false;
     uint32_t _lastFlushAttemptMs = 0;
     uint32_t _lastNtpSyncMs = 0;
+    bool _ntpRetryNeeded = false;
+    uint32_t _ntpRetryAtMs = 0;
 
     bool _postJson(const String &jsonBody);
     bool _sendSingleRecord(const String &uid, const StaffInfo &staff, AttendanceType type, uint32_t ts);

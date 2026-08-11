@@ -70,6 +70,7 @@
 #define SYNC_MAX_BATCH_SIZE        25      // records per POST — keeps RAM usage bounded
 #define SYNC_QUEUE_FLUSH_INTERVAL_MS  5000UL     // background retry cadence while online + queue non-empty
 #define NTP_RESYNC_INTERVAL_MS  (6UL * 3600UL * 1000UL) // re-correct RTC drift every 6h while online
+#define NTP_RETRY_INTERVAL_MS   30000UL                 // retry NTP 30 s after a failed sync attempt
 #define UTC_OFFSET_SECONDS      3600   // UTC+1 (WAT / West Africa Time). Change to your timezone offset in seconds.
 
 // ---------- WiFi provisioning (WiFiManager captive portal) ----------
@@ -102,10 +103,10 @@
 // can download firmware.bin and pull those secrets out with `strings
 // firmware.bin`. Prefer a private repo + token unless you're fine
 // rotating those secrets independent of firmware distribution.
-#define GITHUB_USE_PRIVATE_REPO   true
-#define GITHUB_PAT  "REPLACE_WITH_A_FINE_GRAINED_READ_ONLY_PAT" // only used if GITHUB_USE_PRIVATE_REPO
-#define GITHUB_VERSION_URL   "https://raw.githubusercontent.com/<owner>/<repo>/main/firmware/version.txt"
-#define GITHUB_FIRMWARE_URL  "https://raw.githubusercontent.com/<owner>/<repo>/main/firmware/firmware.bin"
+#define GITHUB_USE_PRIVATE_REPO   false
+#define GITHUB_PAT  ""  // not needed — repo is public
+#define GITHUB_VERSION_URL   "https://raw.githubusercontent.com/ppeterz/attendance_pro/main/firmware/version.txt"
+#define GITHUB_FIRMWARE_URL  "https://raw.githubusercontent.com/ppeterz/attendance_pro/main/firmware/firmware.bin"
 #define GITHUB_OTA_CHECK_INTERVAL_MS  (24UL * 3600UL * 1000UL) // check once a day while connected
 // false (default): device only NOTIFIES you a new version exists (Serial
 // + you trigger it yourself with the "update" CLI command). true: device

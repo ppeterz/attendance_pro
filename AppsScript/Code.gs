@@ -14,7 +14,7 @@
  * Config.h — a long random string, not the placeholder value.
  */
 
-const SHARED_SECRET = "REPLACE_WITH_A_LONG_RANDOM_STRING"; // must match Config.h
+const SHARED_SECRET = "59cfe9e0f6ef676a8efe4e6c384de8a76682d78f7d48c0c7"; // must match Config.h
 const SHEET_NAME = "Attendance";
 const TIMEZONE = "Africa/Lagos"; // WAT, UTC+1, no DST
 
@@ -39,23 +39,40 @@ function doPost(e) {
     const deviceId = body.device || "unknown";
     const now = new Date();
 
-    const rows = body.records.map(function (rec) {
-      const scanDate = new Date(rec.ts * 1000); // rec.ts is unix seconds (UTC)
-      return [
-        Utilities.formatDate(scanDate, TIMEZONE, "yyyy-MM-dd"),
-        Utilities.formatDate(scanDate, TIMEZONE, "HH:mm:ss"),
-        rec.uid || "",
-        rec.fn || "",
-        rec.ln || "",
+    // Build a dedup set from existing rows (UID col=C, Type col=H, Time col=B).
+    // Key = uid|type|date|time so the exact same scan can't appear twice.
+    const existingData = sheet.getDataRange().getValues();
+    const seen = new Set();
+    for (let i = 1; i < existingData.length; i++) {
+      const key = [existingData[i][2], existingData[i][7], existingData[i][0], existingData[i][1]].join("|");
+      seen.add(key);
+    }
+
+    const rows = [];
+    body.records.forEach(function (rec) {
+      const scanDate = new Date(rec.ts * 1000);
+      const dateStr = Utilities.formatDate(scanDate, TIMEZONE, "yyyy-MM-dd");
+      const timeStr = Utilities.formatDate(scanDate, TIMEZONE, "HH:mm:ss");
+      const key = [rec.uid, rec.type, dateStr, timeStr].join("|");
+      if (seen.has(key)) return; // skip exact duplicate
+      seen.add(key);
+      rows.push([
+        dateStr,
+        timeStr,
+        rec.uid  || "",
+        rec.fn   || "",
+        rec.ln   || "",
         rec.role || "",
-        rec.sid || "",
+        rec.sid  || "",
         rec.type || "",
         deviceId,
-        Utilities.formatDate(now, TIMEZONE, "yyyy-MM-dd HH:mm:ss") // when the row was written
-      ];
+        Utilities.formatDate(now, TIMEZONE, "yyyy-MM-dd HH:mm:ss")
+      ]);
     });
 
-    sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
+    if (rows.length > 0) {
+      sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
+    }
 
     return jsonResponse({ status: "ok", count: rows.length });
   } catch (err) {

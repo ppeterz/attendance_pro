@@ -109,19 +109,35 @@ void SyncManager::_flushQueueBatch() {
 }
 
 void SyncManager::_syncTimeFromNtp() {
-    configTime(UTC_OFFSET_SECONDS, 0, "pool.ntp.org", "time.nist.gov");
-    time_t nowSec = time(nullptr);
+    // Give the network stack 2 s to stabilise after WiFi connect before
+    // sending UDP — avoids "Sync failed" on the very first boot attempt.
+    delay(2000);
+
+    // Always fetch raw UTC from NTP (configTime offset only affects localtime(),
+    // NOT time() — so we apply the WAT offset manually before writing the RTC).
+    configTime(0, 0, "pool.ntp.org", "time.nist.gov", "africa.pool.ntp.org");
+    time_t utcSec = time(nullptr);
     int attempts = 0;
-    // Bounded blocking wait (~2s max) — acceptable since this only runs
-    // once per reconnect and then every NTP_RESYNC_INTERVAL_MS.
-    while (nowSec < 100000 && attempts < 20) {
+    // Wait up to 5 s for a valid NTP response.
+    while (utcSec < 100000 && attempts < 50) {
         delay(100);
-        nowSec = time(nullptr);
+        utcSec = time(nullptr);
         attempts++;
     }
-    if (nowSec >= 100000) {
-        _rtc.adjust((uint32_t)nowSec);
+    if (utcSec >= 100000) {
+        time_t localSec = utcSec + UTC_OFFSET_SECONDS; // apply WAT (UTC+1)
+        _rtc.adjust((uint32_t)localSec);
         _lastNtpSyncMs = millis();
+        _ntpRetryNeeded = false;
+        Serial.print(F("[NTP] RTC synced. UTC="));
+        Serial.print((uint32_t)utcSec);
+        Serial.print(F(" WAT="));
+        Serial.println((uint32_t)localSec);
+    } else {
+        // Schedule a retry in 30 s instead of waiting the full 6-hour interval.
+        _ntpRetryNeeded = true;
+        _ntpRetryAtMs = millis();
+        Serial.println(F("[NTP] Sync failed — will retry in 30 s."));
     }
 }
 
@@ -135,7 +151,15 @@ void SyncManager::tick() {
     }
     _wasConnected = connected;
 
-    if (connected && (millis() - _lastNtpSyncMs > NTP_RESYNC_INTERVAL_MS)) {
+    // Retry NTP 30 s after a failed attempt.
+    if (connected && _ntpRetryNeeded &&
+        (millis() - _ntpRetryAtMs >= NTP_RETRY_INTERVAL_MS)) {
+        _syncTimeFromNtp();
+    }
+
+    // Periodic drift correction every 6 hours.
+    if (connected && !_ntpRetryNeeded &&
+        (millis() - _lastNtpSyncMs > NTP_RESYNC_INTERVAL_MS)) {
         _syncTimeFromNtp();
     }
 

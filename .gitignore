@@ -1,0 +1,24 @@
+# Arduino IDE build directories
+build/
+**/build/
+*.elf
+*.hex
+*.map
+
+# IDE settings and scratch files
+.vscode/
+.idea/
+*.sln
+*.vcxproj
+*.user
+*.suo
+
+# OS generated files
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
