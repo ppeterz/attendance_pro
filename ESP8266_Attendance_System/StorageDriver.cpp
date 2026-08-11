@@ -132,14 +132,30 @@ bool StorageDriver::updateDailyStateFromCloud(const String &todayDate, JsonObjec
     for (JsonPairConst kv : statesObj) {
         String uid = kv.key().c_str();
         JsonObjectConst rec = kv.value().as<JsonObjectConst>();
-        uint8_t type = rec["t"].as<uint8_t>();
-        uint8_t count = rec["c"].as<uint8_t>();
+        uint8_t cloudType  = rec["t"].as<uint8_t>();
+        uint8_t cloudCount = rec["c"].as<uint8_t>();
 
-        doc[uid]["d"] = todayDate;
-        doc[uid]["t"] = type;
-        doc[uid]["c"] = count;
-        updatedCount++;
+        // Only update if the cloud knows MORE than local storage.
+        // If local has count=2 (OUT already recorded offline but not yet synced),
+        // a cloud response showing count=1 (IN) must NOT overwrite it — the OUT
+        // is still sitting in the offline queue waiting to be flushed.
+        uint8_t localCount = 0;
+        if (doc.containsKey(uid)) {
+            String localDate = doc[uid]["d"].as<String>();
+            if (localDate == todayDate) {
+                localCount = doc[uid]["c"].as<uint8_t>();
+            }
+        }
+
+        if (cloudCount > localCount) {
+            doc[uid]["d"] = todayDate;
+            doc[uid]["t"] = cloudType;
+            doc[uid]["c"] = cloudCount;
+            updatedCount++;
+        }
     }
+
+    if (updatedCount == 0) return true; // nothing to write
 
     File fw = LittleFS.open(FS_PATH_DAILY_STATE, "w");
     if (fw) {
