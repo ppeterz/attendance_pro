@@ -59,7 +59,7 @@
 #define STATUS_LED_ACTIVE_LOW true
 
 // ---------- Timing / behavior thresholds ----------
-#define DUPLICATE_SCAN_IGNORE_MS   5000    // ignore repeat tap of same card within 5s
+#define DUPLICATE_SCAN_IGNORE_MS   3000    // ignore repeat tap of same card within 3s
 #define RAPID_MULTI_CARD_WARN_MS   2500    // flag rapid taps of different cards (<2.5s)
 #define BUTTON_DEBOUNCE_MS         40
 #define BUTTON_SHORT_MAX_MS        500     // <500ms = short press (manual sync)
@@ -70,7 +70,7 @@
 #define ENROLLMENT_TIMEOUT_MS      60000   // auto-exit enrollment mode if idle 30s
 #define IDLE_SCREEN_REFRESH_MS     1000    // refresh clock on idle LCD screen
 #define WIFI_RECONNECT_RETRY_MS    5000    // how often to nudge WiFi.reconnect() while dropped
-#define SYNC_HTTP_TIMEOUT_MS       10000
+#define SYNC_HTTP_TIMEOUT_MS       3500
 #define SYNC_MAX_BATCH_SIZE        25      // records per POST — keeps RAM usage bounded
 #define SYNC_QUEUE_FLUSH_INTERVAL_MS  5000UL     // background retry cadence while online + queue non-empty
 #define NTP_RESYNC_INTERVAL_MS  (6UL * 3600UL * 1000UL) // re-correct RTC drift every 6h while online
@@ -132,7 +132,7 @@
 #define FS_PATH_OFFLINE_QUEUE    "/queue.jsonl"      // append-only, one record per line
 
 // Google Apps Script Web App URL (deploy as "Anyone" access, /exec endpoint)
-#define SYNC_ENDPOINT_URL   "https://script.google.com/macros/s/AKfycbyUroh-gKqUyYDmWHK3xB6fJOBO_AY4CdYYkf1gWi-ZB9SgYLo1aSdIoWAWqBpxvNULcQ/exec"
+#define SYNC_ENDPOINT_URL   "https://script.google.com/macros/s/AKfycbx6R_2RgCZBh0sBsldz3PZUVzKMnmCwBB8qJO5M7EovqMwSMZjjk_ke_c-184kFE03i7Q/exec"
 // Simple shared-secret so randoms can't POST junk into your sheet
 #define SYNC_SHARED_SECRET  "59cfe9e0f6ef676a8efe4e6c384de8a76682d78f7d48c0c7"
 

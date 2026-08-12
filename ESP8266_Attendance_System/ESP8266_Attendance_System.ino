@@ -404,7 +404,11 @@ void loop() {
         if (attendanceLogic.tick(event)) {
             uiManager.showScanResult(event);
             if (event.result == AttendanceEvent::Result::VALID_SCAN) {
-                sync.sendOrQueue(event);
+                // enqueue() is a non-blocking flash write (<1 ms).
+                // tick() at the top of the next loop iteration sends it.
+                // This ensures the HTTPS POST never blocks the LCD transient
+                // or prevents the next staff member from scanning their card.
+                sync.enqueue(event);
             }
         }
     }

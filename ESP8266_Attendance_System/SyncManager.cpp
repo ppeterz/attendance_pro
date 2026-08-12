@@ -29,7 +29,7 @@ bool SyncManager::_postJson(const String &jsonBody) {
 
     HTTPClient https;
     https.setTimeout(SYNC_HTTP_TIMEOUT_MS);
-    https.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
+    https.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS); // Clean 2-step handling prevents BearSSL socket reuse errors (-1)
 
     if (!https.begin(client, SYNC_ENDPOINT_URL)) {
         Serial.println(F("[SYNC] Failed to begin HTTPS connection."));
@@ -42,11 +42,35 @@ bool SyncManager::_postJson(const String &jsonBody) {
     Serial.print(F("[SYNC] HTTP POST code: "));
     Serial.println(httpCode);
 
-    if (httpCode > 0) {
+    if (httpCode == 200) {
         String resp = https.getString();
         Serial.print(F("[SYNC] Response: "));
         Serial.println(resp);
         ok = (resp.indexOf("\"status\":\"ok\"") >= 0);
+        https.end();
+    } else if (httpCode == 302 || httpCode == 301 || httpCode == 307) {
+        // HTTP 302 means Google Apps Script executed doPost() successfully!
+        ok = true;
+        String redirectUrl = https.getLocation();
+        https.end(); // Close 1st TLS connection cleanly before opening 2nd to different domain
+
+        if (redirectUrl.length() > 0) {
+            WiFiClientSecure client2;
+            client2.setInsecure();
+            HTTPClient https2;
+            https2.setTimeout(SYNC_HTTP_TIMEOUT_MS);
+            if (https2.begin(client2, redirectUrl)) {
+                int code2 = https2.GET();
+                if (code2 == 200) {
+                    String resp = https2.getString();
+                    Serial.print(F("[SYNC] Redirect response: "));
+                    Serial.println(resp);
+                }
+                https2.end();
+            }
+        }
+    } else {
+        https.end();
     }
 
     if (ok) {
@@ -55,15 +79,11 @@ bool SyncManager::_postJson(const String &jsonBody) {
         Serial.println(F("[SYNC] Sync failed or rejected by server."));
     }
 
-    https.end();
     return ok;
 }
 
 bool SyncManager::_sendSingleRecord(const String &uid, const StaffInfo &staff,
                                      AttendanceType type, uint32_t ts) {
-    // Built via ArduinoJson (not string concatenation) so a name/role
-    // typed with a quote/backslash during enrollment can't break the
-    // JSON payload.
     StaticJsonDocument<SYNC_RECORD_JSON_CAPACITY> doc;
     doc["secret"] = SYNC_SHARED_SECRET;
     doc["device"] = DEVICE_ID;
@@ -94,6 +114,11 @@ void SyncManager::sendOrQueue(const AttendanceEvent &event) {
     }
 }
 
+void SyncManager::enqueue(const AttendanceEvent &event) {
+    _storage.appendToQueue(event.uid, event.staff, event.type, event.timestamp);
+    _flushRequested = true; // tick() will flush on the next loop iteration if backoff cleared
+}
+
 void SyncManager::_flushQueueBatch() {
     int n = 0;
     String batch = _storage.readQueueBatchAsJsonArray(SYNC_MAX_BATCH_SIZE, n);
@@ -106,9 +131,17 @@ void SyncManager::_flushQueueBatch() {
     bool ok = _postJson(payload);
     if (ok) {
         _storage.removeFirstNFromQueue(n);
-        // If more remain, next tick's cadence check will pick up the rest.
+        _flushBackoffMs = 5000; // Reset backoff on success
+        _nextFlushAllowedMs = millis();
+    } else {
+        // Exponential backoff on failure: 5s -> 10s -> 20s -> 40s -> 60s max
+        _flushBackoffMs = _flushBackoffMs * 2;
+        if (_flushBackoffMs > 60000) _flushBackoffMs = 60000;
+        _nextFlushAllowedMs = millis() + _flushBackoffMs;
+        Serial.print(F("[SYNC] Flush failed. Next retry in "));
+        Serial.print(_flushBackoffMs / 1000);
+        Serial.println(F("s."));
     }
-    // On failure: leave the queue untouched, retry on the next cadence.
 }
 
 void SyncManager::syncDailyStateFromCloud() {
@@ -129,14 +162,39 @@ void SyncManager::syncDailyStateFromCloud() {
     client.setInsecure();
     HTTPClient https;
     https.setTimeout(SYNC_HTTP_TIMEOUT_MS);
-    https.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
+    https.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
 
     if (!https.begin(client, SYNC_ENDPOINT_URL)) return;
     https.addHeader("Content-Type", "application/json");
 
     int code = https.POST(payload);
-    if (code > 0) {
-        String resp = https.getString();
+    String resp = "";
+
+    if (code == 200) {
+        resp = https.getString();
+        https.end();
+    } else if (code == 302 || code == 301 || code == 307) {
+        String redirectUrl = https.getLocation();
+        https.end(); // Close 1st TLS connection cleanly before opening 2nd
+
+        if (redirectUrl.length() > 0) {
+            WiFiClientSecure client2;
+            client2.setInsecure();
+            HTTPClient https2;
+            https2.setTimeout(SYNC_HTTP_TIMEOUT_MS);
+            if (https2.begin(client2, redirectUrl)) {
+                int code2 = https2.GET();
+                if (code2 == 200) {
+                    resp = https2.getString();
+                }
+                https2.end();
+            }
+        }
+    } else {
+        https.end();
+    }
+
+    if (resp.length() > 0) {
         DynamicJsonDocument doc(DAYSTATE_JSON_CAPACITY);
         DeserializationError err = deserializeJson(doc, resp);
         if (!err && doc["status"] == "ok" && doc.containsKey("states")) {
@@ -149,69 +207,68 @@ void SyncManager::syncDailyStateFromCloud() {
             Serial.println(F(" staff records)."));
         }
     }
-    https.end();
 }
 
-void SyncManager::_syncTimeFromNtp() {
-    // Give the network stack 2 s to stabilise after WiFi connect before
-    // sending UDP — avoids "Sync failed" on the very first boot attempt.
-    delay(2000);
-
-    // Always fetch raw UTC from NTP (configTime offset only affects localtime(),
-    // NOT time() — so we apply the WAT offset manually before writing the RTC).
+void SyncManager::_startNtpSync() {
     configTime(0, 0, "pool.ntp.org", "time.nist.gov", "africa.pool.ntp.org");
-    time_t utcSec = time(nullptr);
-    int attempts = 0;
-    // Wait up to 5 s for a valid NTP response.
-    while (utcSec < 100000 && attempts < 50) {
-        delay(100);
-        utcSec = time(nullptr);
-        attempts++;
-    }
-    if (utcSec >= 100000) {
-        time_t localSec = utcSec + UTC_OFFSET_SECONDS; // apply WAT (UTC+1)
-        _rtc.adjust((uint32_t)localSec);
-        _lastNtpSyncMs = millis();
-        _ntpRetryNeeded = false;
-        Serial.print(F("[NTP] RTC synced. UTC="));
-        Serial.print((uint32_t)utcSec);
-        Serial.print(F(" WAT="));
-        Serial.println((uint32_t)localSec);
-        syncDailyStateFromCloud();
-    } else {
-        // Schedule a retry in 30 s instead of waiting the full 6-hour interval.
-        _ntpRetryNeeded = true;
-        _ntpRetryAtMs = millis();
-        Serial.println(F("[NTP] Sync failed — will retry in 30 s."));
-    }
+    _ntpSyncPending = true;
+    _ntpStartMs = millis();
 }
 
 void SyncManager::tick() {
     bool connected = _net.isConnected();
 
-    // Reconnect edge: correct RTC drift and kick an immediate flush.
+    // Reconnect edge: start NTP sync (non-blocking) and set flush flag.
     if (connected && !_wasConnected) {
-        _syncTimeFromNtp();
+        _startNtpSync();
         _flushRequested = true;
     }
     _wasConnected = connected;
 
+    // Check background NTP response non-blockingly
+    if (connected && _ntpSyncPending) {
+        time_t utcSec = time(nullptr);
+        if (utcSec >= 100000) {
+            time_t localSec = utcSec + UTC_OFFSET_SECONDS; // apply WAT (UTC+1)
+            _rtc.adjust((uint32_t)localSec);
+            _lastNtpSyncMs = millis();
+            _ntpSyncPending = false;
+            _ntpRetryNeeded = false;
+            Serial.print(F("[NTP] RTC synced. UTC="));
+            Serial.print((uint32_t)utcSec);
+            Serial.print(F(" WAT="));
+            Serial.println((uint32_t)localSec);
+            _cloudStateSyncPending = true;
+        } else if (millis() - _ntpStartMs >= 8000) {
+            _ntpSyncPending = false;
+            _ntpRetryNeeded = true;
+            _ntpRetryAtMs = millis();
+            Serial.println(F("[NTP] Sync timed out — will retry in 30 s."));
+        }
+    }
+
+    if (connected && _cloudStateSyncPending) {
+        _cloudStateSyncPending = false;
+        syncDailyStateFromCloud();
+    }
+
     // Retry NTP 30 s after a failed attempt.
-    if (connected && _ntpRetryNeeded &&
+    if (connected && !_ntpSyncPending && _ntpRetryNeeded &&
         (millis() - _ntpRetryAtMs >= NTP_RETRY_INTERVAL_MS)) {
-        _syncTimeFromNtp();
+        _startNtpSync();
     }
 
     // Periodic drift correction every 6 hours.
-    if (connected && !_ntpRetryNeeded &&
+    if (connected && !_ntpSyncPending && !_ntpRetryNeeded &&
         (millis() - _lastNtpSyncMs > NTP_RESYNC_INTERVAL_MS)) {
-        _syncTimeFromNtp();
+        _startNtpSync();
     }
 
     bool queueHasWork = !_storage.queueIsEmpty();
     bool cadenceElapsed = (millis() - _lastFlushAttemptMs) >= SYNC_QUEUE_FLUSH_INTERVAL_MS;
+    bool backoffCleared = (millis() >= _nextFlushAllowedMs);
 
-    if (connected && queueHasWork && (_flushRequested || cadenceElapsed)) {
+    if (connected && queueHasWork && backoffCleared && (_flushRequested || cadenceElapsed)) {
         _lastFlushAttemptMs = millis();
         _flushRequested = false;
         _flushQueueBatch();

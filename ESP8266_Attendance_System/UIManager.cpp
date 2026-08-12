@@ -8,8 +8,6 @@ void UIManager::begin() {
 }
 
 void UIManager::finishStartup() {
-    _lcd.showTwoLines("System Ready", "Starting up...");
-    delay(1000);
     _showIdle(0);
 }
 
@@ -53,22 +51,25 @@ void UIManager::showScanResult(const AttendanceEvent &event) {
             String typeStr = (event.type == AttendanceType::CHECK_IN) ? "IN " : "OUT ";
             line1 = event.staff.firstName;
             line2 = typeStr + _rtc.nowTimeString();
-            break;
+            _showTransient(line1, line2, 1200); // 1.2s — enough to read, short enough for fast throughput
+            return;
         }
         case AttendanceEvent::Result::ALREADY_COMPLETED_TODAY:
             line1 = event.staff.firstName;
             line2 = "Done for today";
-            break;
+            _showTransient(line1, line2, 1200);
+            return;
         case AttendanceEvent::Result::DUPLICATE_IGNORED:
             line1 = "Already scanned";
             line2 = "One moment...";
-            break;
+            _showTransient(line1, line2, 800); // very brief — just acknowledge the tap
+            return;
         case AttendanceEvent::Result::UNKNOWN_CARD:
             line1 = "Unknown card";
             line2 = "See admin";
-            break;
+            _showTransient(line1, line2, 1200);
+            return;
     }
-    _showTransient(line1, line2, 2000);
 }
 
 void UIManager::showManualSyncTriggered() {

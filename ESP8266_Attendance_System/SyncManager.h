@@ -14,11 +14,11 @@
 // via NTP. Decoupled from AttendanceLogic: it only ever receives a
 // finished AttendanceEvent, never reaches into HAL/RFID directly.
 //
-// NOTE on blocking: the actual HTTPS POST call blocks the loop for up
-// to SYNC_HTTP_TIMEOUT_MS while it's in flight. This is a deliberate,
-// bounded tradeoff (not a busy-wait) — it only happens when a scan
-// needs sending or a queued batch is being flushed, which is
-// infrequent relative to the RFID poll rate.
+// NOTE on blocking: _postJson blocks the loop for up to SYNC_HTTP_TIMEOUT_MS
+// while a request is in flight. This only happens inside tick() (called at
+// the top of loop()), so it NEVER holds up the LCD transient display or RFID
+// scanning. Scan events are enqueued instantly via enqueue() and flushed by
+// tick() on the very next loop iteration.
 class SyncManager {
 public:
     SyncManager(StorageDriver &storage, RTC_Driver &rtc, NetworkManager &net);
@@ -26,8 +26,15 @@ public:
     void begin();
     void tick(); // non-blocking gate; drives auto-flush + periodic NTP resync
 
-    // Call right after AttendanceLogic produces a VALID_SCAN event.
-    // Tries a live send if online; queues on failure/offline.
+    // PRIMARY path: write the event to the offline queue immediately (non-
+    // blocking flash write, <1 ms) and request an immediate flush so tick()
+    // sends it on the very next loop iteration. Use this from the main loop
+    // so the HTTPS POST never blocks the LCD transient or RFID scanning.
+    void enqueue(const AttendanceEvent &event);
+
+    // LEGACY: tries a live HTTPS send first, falls back to queuing.
+    // Blocks the loop for up to SYNC_HTTP_TIMEOUT_MS — avoid calling this
+    // from inside the scan handler; prefer enqueue() instead.
     void sendOrQueue(const AttendanceEvent &event);
 
     // Wire this to the button's SHORT_PRESS event.
@@ -48,10 +55,17 @@ private:
     bool _ntpRetryNeeded = false;
     uint32_t _ntpRetryAtMs = 0;
 
+    bool _ntpSyncPending = false;
+    uint32_t _ntpStartMs = 0;
+    bool _cloudStateSyncPending = false;
+
+    uint32_t _nextFlushAllowedMs = 0;
+    uint32_t _flushBackoffMs = 5000;
+
     bool _postJson(const String &jsonBody);
     bool _sendSingleRecord(const String &uid, const StaffInfo &staff, AttendanceType type, uint32_t ts);
     void _flushQueueBatch();
-    void _syncTimeFromNtp();
+    void _startNtpSync();
 };
 
 #endif // SYNC_MANAGER_H
